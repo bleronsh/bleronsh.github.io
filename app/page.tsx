@@ -318,15 +318,15 @@ export default function SchengenTracker() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground font-sans">Schengen Stay Tracker</h1>
-          <p className="text-muted-foreground font-serif">Monitor your 90/180 day stays in the Schengen area</p>
+          <h1 className="text-3xl font-bold text-foreground font-sans">Njehsori I diteve ne Shengen</h1>
+          <p className="text-muted-foreground font-serif">Njehso ditet 90/180 te qendrimit ne zonen Shengen</p>
         </div>
 
         {/* Dashboard Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium font-sans">Days Used</CardTitle>
+              <CardTitle className="text-sm font-medium font-sans">Diteve te perdorura</CardTitle>
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -337,7 +337,7 @@ export default function SchengenTracker() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium font-sans">Days Remaining</CardTitle>
+              <CardTitle className="text-sm font-medium font-sans">Ditet e mbetura</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -364,7 +364,7 @@ export default function SchengenTracker() {
                     <div className="text-xs">{nextEntryDate.toLocaleDateString()}</div>
                   </div>
                 ) : (
-                  <div className="text-green-600 font-medium">Can travel freely</div>
+                  <div className="text-green-600 font-medium">Mund te udhetoni lirisht</div>
                 )}
               </div>
             </CardContent>
@@ -379,12 +379,12 @@ export default function SchengenTracker() {
               <div className="text-sm font-serif">
                 {nextAvailableEntry ? (
                   <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">Available from:</div>
+                    <div className="text-xs text-muted-foreground">Te perdorshme prej:</div>
                     <div className="text-xs font-medium">{nextAvailableEntry.toLocaleDateString()}</div>
-                    <div className="text-xs text-green-600">Up to {maxStayFromNext} days</div>
+                    <div className="text-xs text-green-600">Deri ne {maxStayFromNext} dite</div>
                   </div>
                 ) : (
-                  <div className="text-muted-foreground">No future stays available</div>
+                  <div className="text-muted-foreground">S'ka dite te mbetura</div>
                 )}
               </div>
             </CardContent>
@@ -395,13 +395,13 @@ export default function SchengenTracker() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="font-sans">Select Stay Days</CardTitle>
+              <CardTitle className="font-sans">Zgjidh ditet e qendrimit</CardTitle>
               <CardDescription className="font-serif">
                 {selectionMode === "single"
-                  ? "Click on dates to mark individual stays"
+                  ? "Kliko daten e qendrimit"
                   : rangeStart
-                    ? "Click end date to complete range selection"
-                    : "Click start date to begin range selection"}
+                    ? "Kliko daten e fundit te qendrimit per te plotësuar zgjedhjen"
+                    : "Kliko daten e fillimit te qendrimit per te filluar zgjedhjen"}
               </CardDescription>
               <div className="flex gap-2 pt-2">
                 <Button
@@ -457,9 +457,9 @@ export default function SchengenTracker() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="font-sans">Future Availability</CardTitle>
+              <CardTitle className="font-sans">Disponimi i diteve ne te ardhmen</CardTitle>
               <CardDescription className="font-serif">
-                Click on green dates to see how many days you can stay from that entry date
+                Kliko data me te gjelber per te pare se sa dite mund te qendroni deri ne kete date hyerjeje
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -499,7 +499,7 @@ export default function SchengenTracker() {
               <div className="mt-4 space-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-green-600 rounded"></div>
-                  <span className="font-serif">Available for entry (click to see stay duration)</span>
+                  <span className="font-serif">Mund te hyeni (kliko per te pare se sa ditë mund te qendroni)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-muted rounded"></div>
@@ -532,8 +532,8 @@ export default function SchengenTracker() {
         {/* Stay Summary */}
         <Card>
           <CardHeader>
-            <CardTitle className="font-sans">Stay Summary</CardTitle>
-            <CardDescription className="font-serif">Overview of your Schengen area stays</CardDescription>
+            <CardTitle className="font-sans">Permbledhja e diteve ne Shengen</CardTitle>
+            <CardDescription className="font-serif">Përmbledhja e ditëve të qendrimit në Shengen</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
