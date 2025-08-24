@@ -244,17 +244,14 @@ export default function SchengenTracker() {
     fileInputRef.current?.click()
   }
 
-  const calculateFutureStayInfo = (futureDate: Date) => {
+  const calculateFutureStayInfo = (futureDate: Date, dates: Readonly<Date[]>) => {
     const windowStart = new Date(futureDate)
     windowStart.setDate(windowStart.getDate() - 180)
 
     // Count days used in the 180-day window before the future date
-    let daysUsedInWindow = 0
-    selectedDates.forEach((date) => {
-      if (date >= windowStart && date < futureDate) {
-        daysUsedInWindow++
-      }
-    })
+    const daysUsedInWindow = dates.filter(
+      (date) => date >= windowStart && date < futureDate,
+    ).length
 
     const availableDays = Math.max(0, 90 - daysUsedInWindow)
     return { daysUsedInWindow, availableDays }
@@ -270,7 +267,7 @@ export default function SchengenTracker() {
       const checkDate = new Date(startDate)
       checkDate.setDate(startDate.getDate() + i)
 
-      const { availableDays } = calculateFutureStayInfo(checkDate)
+      const { availableDays } = calculateFutureStayInfo(checkDate, selectedDates)
       if (availableDays > 0) {
         availableDates.push(new Date(checkDate))
       }
@@ -281,14 +278,20 @@ export default function SchengenTracker() {
 
   const getMaxContinuousStay = (startDate: Date) => {
     let maxDays = 0
+    const tempSelectedDates = [...selectedDates]
     const checkDate = new Date(startDate)
 
     for (let i = 0; i < 90; i++) {
-      const { availableDays } = calculateFutureStayInfo(checkDate)
+      // We need to check availability for the current day of the potential stay
+      const { availableDays } = calculateFutureStayInfo(checkDate, tempSelectedDates)
+
       if (availableDays > 0) {
+        // If a day is available, add it to our temporary stay list and check the next day
         maxDays++
+        tempSelectedDates.push(new Date(checkDate))
         checkDate.setDate(checkDate.getDate() + 1)
       } else {
+        // If a day is not available, the continuous stay is broken
         break
       }
     }
@@ -297,7 +300,7 @@ export default function SchengenTracker() {
   }
 
   const handleFutureDateClick = (date: Date) => {
-    const { availableDays } = calculateFutureStayInfo(date)
+    const { availableDays } = calculateFutureStayInfo(date, selectedDates)
     if (availableDays > 0) {
       const maxContinuous = getMaxContinuousStay(date)
       setSelectedFutureEntry(date)
@@ -473,7 +476,7 @@ export default function SchengenTracker() {
                 modifiers={{
                   available: futureAvailableDates,
                   unavailable: (date) => {
-                    const { availableDays } = calculateFutureStayInfo(date)
+                    const { availableDays } = calculateFutureStayInfo(date, selectedDates)
                     return availableDays === 0 && date > new Date()
                   },
                   selected: selectedFutureEntry ? [selectedFutureEntry] : [],
