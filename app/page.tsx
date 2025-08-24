@@ -158,9 +158,9 @@ export default function SchengenTracker() {
   }
 
   const getStatusText = () => {
-    if (daysUsed > 90) return "Limit Exceeded"
-    if (daysUsed > 75) return "Approaching Limit"
-    return "Within Limits"
+    if (daysUsed > 90) return "Limiti i kaluar"
+    if (daysUsed > 75) return "Duke iu afruar limitit"
+    return "Ne limitet"
   }
 
   const exportData = () => {
@@ -350,7 +350,7 @@ export default function SchengenTracker() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium font-sans">Current Status</CardTitle>
+              <CardTitle className="text-sm font-medium font-sans">Statusi i tanishëm</CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -359,7 +359,7 @@ export default function SchengenTracker() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-1 text-destructive">
                       <AlertTriangle className="h-3 w-3" />
-                      <span className="font-medium">Next Entry:</span>
+                      <span className="font-medium">Hyrja e ardhshme:</span>
                     </div>
                     <div className="text-xs">{nextEntryDate.toLocaleDateString()}</div>
                   </div>
@@ -413,7 +413,7 @@ export default function SchengenTracker() {
                   }}
                   className="font-sans"
                 >
-                  Single Days
+                  Nje nga nje
                 </Button>
                 <Button
                   variant={selectionMode === "range" ? "default" : "outline"}
@@ -421,7 +421,7 @@ export default function SchengenTracker() {
                   onClick={() => setSelectionMode("range")}
                   className="font-sans"
                 >
-                  Date Range
+                  Grup i diteve
                 </Button>
                 {rangeStart && (
                   <Badge variant="secondary" className="ml-2">
@@ -539,15 +539,15 @@ export default function SchengenTracker() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-serif">Total days selected:</span>
+                  <span className="font-serif">Totali i diteve të zgjedhura:</span>
                   <span className="font-sans font-medium">{selectedDates.length}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="font-serif">Days in current window:</span>
+                  <span className="font-serif">Ditet ne dritaren e tanishme:</span>
                   <span className="font-sans font-medium">{daysUsed}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="font-serif">Window start date:</span>
+                  <span className="font-serif">Data e fillimit te dritares:</span>
                   <span className="font-sans font-medium">
                     {new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toLocaleDateString()}
                   </span>
@@ -556,19 +556,19 @@ export default function SchengenTracker() {
 
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-serif">Next available entry:</span>
+                  <span className="font-serif">Hyrja e ardhshme e mundshme:</span>
                   <span className="font-sans font-medium">
                     {nextAvailableEntry ? nextAvailableEntry.toLocaleDateString() : "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="font-serif">Max continuous stay:</span>
+                  <span className="font-serif">Ditet e mbetura ne dritaren e tanishme:</span>
                   <span className="font-sans font-medium">
                     {maxStayFromNext > 0 ? `${maxStayFromNext} days` : "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="font-serif">Available days in next 30:</span>
+                  <span className="font-serif">Ditet e mbetura ne 30 ditë:</span>
                   <span className="font-sans font-medium">
                     {
                       futureAvailableDates.filter((date) => {
