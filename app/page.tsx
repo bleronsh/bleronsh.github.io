@@ -586,15 +586,15 @@ export default function SchengenTracker() {
               <div className="grid grid-cols-2 gap-2">
                 <Button onClick={exportData} variant="outline" className="font-sans bg-transparent">
                   <Download className="h-4 w-4 mr-2" />
-                  Export
+                  Eksporto
                 </Button>
                 <Button onClick={triggerImport} variant="outline" className="font-sans bg-transparent">
                   <Upload className="h-4 w-4 mr-2" />
-                  Import
+                  Importo
                 </Button>
               </div>
               <Button onClick={clearAllDates} variant="outline" className="w-full font-sans bg-transparent">
-                Clear All Dates
+                Fshij te gjitha ditet
               </Button>
               <input ref={fileInputRef} type="file" accept=".json" onChange={importData} className="hidden" />
             </div>
