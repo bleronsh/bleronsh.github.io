@@ -183,6 +183,7 @@ function getMaxSafeStayFromDate(trips: Trip[], plannedEntry: string): { maxDays:
 // --- STATE MANAGEMENT ---
 
 const STORAGE_KEY = 'schengen_calculator_data';
+const MAX_PROFILES = 20;
 
 function useSchengenStore() {
   const [profiles, setProfiles] = useState<Profile[]>([{ id: 'default', name: 'Me', trips: [] }]);
@@ -216,7 +217,7 @@ function useSchengenStore() {
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0];
 
   const addProfile = (name: string) => {
-    if (profiles.length >= 10) return;
+    if (profiles.length >= MAX_PROFILES) return;
     const newId = crypto.randomUUID();
     setProfiles([...profiles, { id: newId, name, trips: [] }]);
     setActiveProfileId(newId);
