@@ -1,20 +1,22 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
-import { 
-  format, 
-  addDays, 
-  isBefore, 
-  isAfter, 
-  differenceInCalendarDays, 
-  startOfMonth, 
-  endOfMonth, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  isSameMonth, 
+import {
+  format,
+  addDays,
+  isBefore,
+  isAfter,
+  differenceInCalendarDays,
+  startOfMonth,
+  endOfMonth,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameMonth,
   addMonths,
   isWithinInterval
 } from 'date-fns';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // --- POLYFILLS FOR MISSING IMPORTS ---
 
@@ -668,13 +670,160 @@ const WindowBreakdown = ({ trips, referenceDate }: { trips: Trip[], referenceDat
   );
 };
 
+// --- PDF EXPORT ---
+function exportProfilesPDF(profiles: Profile[]) {
+  const doc = new jsPDF();
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+  const todayDisplay = format(today, DISPLAY_DATE_FORMAT);
+  const windowStartDate = subDaysPolyfill(today, 179);
+  const windowStartDisplay = format(windowStartDate, DISPLAY_DATE_FORMAT);
+
+  profiles.forEach((profile, idx) => {
+    if (idx > 0) doc.addPage();
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    // Header
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SchengenCalc', 14, y);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(120);
+    doc.text(`Generated: ${todayDisplay}`, pageWidth - 14, y, { align: 'right' });
+    y += 12;
+
+    // Profile name
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30);
+    doc.text(profile.name, 14, y);
+    y += 10;
+
+    // Window status
+    const used = calculateUsedDaysWithinWindow(profile.trips, todayStr);
+    const remaining = Math.max(0, 90 - used);
+    const maxStay = getMaxSafeStayFromDate(profile.trips, todayStr);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(80);
+    doc.text('180-Day Window Status', 14, y);
+    y += 7;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60);
+    doc.text(`Window: ${windowStartDisplay} \u2013 ${todayDisplay}`, 14, y);
+    y += 6;
+    doc.text(`Days used: ${used} / 90`, 14, y);
+    doc.text(`Days remaining: ${remaining}`, 100, y);
+    y += 6;
+    doc.text(`Max stay from today: ${maxStay.maxDays} days (until ${maxStay.untilDate})`, 14, y);
+    y += 12;
+
+    // Trip history table (only trips within the 180-day window)
+    const sortedTrips = [...profile.trips]
+      .filter(t => !isBefore(parseISO(t.exitDate), windowStartDate) && !isAfter(parseISO(t.entryDate), today))
+      .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(80);
+    doc.text('Trip History', 14, y);
+    y += 2;
+
+    if (sortedTrips.length === 0) {
+      y += 6;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(150);
+      doc.text('No trips recorded.', 14, y);
+      y += 10;
+    } else {
+      const tripRows = sortedTrips.map(t => {
+        const days = differenceInCalendarDays(parseISO(t.exitDate), parseISO(t.entryDate)) + 1;
+        return [
+          format(parseISO(t.entryDate), DISPLAY_DATE_FORMAT),
+          format(parseISO(t.exitDate), DISPLAY_DATE_FORMAT),
+          String(days)
+        ];
+      });
+      const totalDays = sortedTrips.reduce((sum, t) =>
+        sum + differenceInCalendarDays(parseISO(t.exitDate), parseISO(t.entryDate)) + 1, 0
+      );
+      tripRows.push(['', 'Total', String(totalDays)]);
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Entry', 'Exit', 'Days']],
+        body: tripRows,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 9, textColor: [50, 50, 50] },
+        columnStyles: { 2: { halign: 'right', fontStyle: 'bold' } },
+        margin: { left: 14, right: 14 },
+        didParseCell: (data) => {
+          // Style the total row
+          if (data.row.index === tripRows.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [243, 244, 246];
+          }
+        },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Entry forecast
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(80);
+    doc.text('Upcoming Entry Forecast', 14, y);
+    y += 7;
+
+    const forecastRows = Array.from({ length: 6 }, (_, i) => {
+      const date = addDays(today, (i + 1) * 14);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const ms = getMaxSafeStayFromDate(profile.trips, dateStr);
+      return [
+        format(date, 'dd MMM yyyy'),
+        `${ms.maxDays} days`,
+        ms.maxDays > 0 ? `until ${ms.untilDate}` : 'No days available'
+      ];
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Entry Date', 'Max Stay', 'Until']],
+      body: forecastRows,
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 9, textColor: [50, 50, 50] },
+      margin: { left: 14, right: 14 },
+    });
+
+    // Footer
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(160);
+    doc.text('SchengenCalc \u2013 This document is for personal reference only and does not constitute legal advice.', 14, pageHeight - 10);
+    doc.text(`Page ${idx + 1} of ${profiles.length}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
+  });
+
+  doc.save(`schengen-report-${format(today, 'yyyy-MM-dd')}.pdf`);
+}
+
 // --- COMPONENT: Profile Window Status ---
 const ProfileWindowStatus = ({ trips }: { trips: Trip[] }) => {
   const today = format(new Date(), 'yyyy-MM-dd');
   const todayObj = parseISO(today);
   const windowStart = subDaysPolyfill(todayObj, 179);
   const used = calculateUsedDaysWithinWindow(trips, today);
-  const remaining = Math.max(0, 90 - used);
+  const remaining = getMaxSafeStayFromDate(trips, today).maxDays;
   const color = remaining === 0 ? 'text-red-600' : remaining <= 10 ? 'text-orange-500' : 'text-emerald-600';
   const barColor = remaining === 0 ? 'bg-red-500' : remaining <= 10 ? 'bg-orange-400' : 'bg-blue-500';
 
@@ -1073,7 +1222,16 @@ const ProfilesScreen = ({ store }: { store: ReturnType<typeof useSchengenStore> 
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h2 className="text-3xl font-black text-gray-900">Manage Profiles</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-black text-gray-900">Manage Profiles</h2>
+        <button
+          onClick={() => exportProfilesPDF(store.profiles)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          Export PDF
+        </button>
+      </div>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div className="flex gap-4">
@@ -1096,7 +1254,11 @@ const ProfilesScreen = ({ store }: { store: ReturnType<typeof useSchengenStore> 
       <div className="grid gap-4">
         {store.profiles.map(p => {
           const isExpanded = expandedIds.has(p.id);
-          const sortedTrips = [...p.trips].sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+          const windowStart = subDaysPolyfill(new Date(), 179);
+          const todayDate = new Date();
+          const sortedTrips = [...p.trips]
+            .filter(t => !isBefore(parseISO(t.exitDate), windowStart) && !isAfter(parseISO(t.entryDate), todayDate))
+            .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
 
           return (
             <div
