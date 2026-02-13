@@ -668,6 +668,41 @@ const WindowBreakdown = ({ trips, referenceDate }: { trips: Trip[], referenceDat
   );
 };
 
+// --- COMPONENT: Entry Date Forecast ---
+const EntryDateForecast = ({ trips }: { trips: Trip[] }) => {
+  const forecasts = useMemo(() => {
+    const today = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const date = addDays(today, (i + 1) * 14);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const used = calculateUsedDaysWithinWindow(trips, dateStr);
+      const remaining = Math.max(0, 90 - used);
+      return { date, dateStr, remaining };
+    });
+  }, [trips]);
+
+  return (
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+      <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Upcoming Entry Forecast</h3>
+      <div className="space-y-3">
+        {forecasts.map(({ date, dateStr, remaining }) => {
+          const color = remaining === 0 ? 'text-red-600' : remaining <= 10 ? 'text-orange-500' : 'text-emerald-600';
+          return (
+            <div key={dateStr} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+              <span className="text-sm text-gray-600">
+                If you enter on <span className="font-bold text-gray-900">{format(date, 'dd MMM yyyy')}</span>
+              </span>
+              <span className={`text-sm font-bold ${color}`}>
+                {remaining} days left
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // --- ICONS ---
 const ChevronLeft = () => <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>;
 const ChevronRight = () => <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>;
@@ -812,10 +847,12 @@ const DashboardScreen = ({ store }: { store: ReturnType<typeof useSchengenStore>
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
             <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-3">Planning Ahead</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
-              If you enter on <span className="font-bold text-gray-900">{format(planningStart, DISPLAY_DATE_FORMAT)}</span>, 
+              If you enter on <span className="font-bold text-gray-900">{format(planningStart, DISPLAY_DATE_FORMAT)}</span>,
               you can stay for <span className="font-bold text-blue-600">{maxStay.maxDays} days</span> (until {maxStay.untilDate}).
             </p>
           </div>
+
+          <EntryDateForecast trips={activeProfile.trips} />
         </div>
 
         {/* Right Col: Calendar */}
@@ -1008,54 +1045,60 @@ const ProfilesScreen = ({ store }: { store: ReturnType<typeof useSchengenStore> 
 
       <div className="grid gap-4">
         {store.profiles.map(p => (
-          <div 
+          <div
             key={p.id}
             onClick={() => store.setActiveProfileId(p.id)}
             className={`
-              flex justify-between items-center p-5 rounded-xl border-2 transition-all cursor-pointer bg-white group
+              rounded-xl border-2 transition-all cursor-pointer bg-white group
               ${store.activeProfileId === p.id ? 'border-blue-500 shadow-md ring-1 ring-blue-100' : 'border-transparent shadow-sm hover:border-gray-200'}
             `}
           >
-            <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${store.activeProfileId === p.id ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                {p.name.charAt(0).toUpperCase()}
+            <div className="flex justify-between items-center p-5">
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${store.activeProfileId === p.id ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                  {p.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="font-bold text-gray-800 text-lg">{p.name}</div>
+                  <div className="text-sm text-gray-500">{p.trips.length} trips recorded</div>
+                </div>
               </div>
-              <div>
-                <div className="font-bold text-gray-800 text-lg">{p.name}</div>
-                <div className="text-sm text-gray-500">{p.trips.length} trips recorded</div>
+
+              <div className="flex items-center gap-3">
+                {store.activeProfileId === p.id && <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">ACTIVE</span>}
+
+                {store.profiles.length > 1 && (
+                  deleteConfirmId === p.id ? (
+                     <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200" onClick={e => e.stopPropagation()}>
+                       <span className="text-xs text-red-600 font-bold">Sure?</span>
+                       <button
+                         onClick={(e) => { e.stopPropagation(); store.removeProfile(p.id); setDeleteConfirmId(null); }}
+                         className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-xs font-bold shadow-sm"
+                       >
+                         Yes
+                       </button>
+                       <button
+                         onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(null); }}
+                         className="text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md text-xs font-bold"
+                       >
+                         No
+                       </button>
+                     </div>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(p.id); }}
+                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-all"
+                      title="Delete Profile"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  )
+                )}
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              {store.activeProfileId === p.id && <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">ACTIVE</span>}
-              
-              {store.profiles.length > 1 && (
-                deleteConfirmId === p.id ? (
-                   <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200" onClick={e => e.stopPropagation()}>
-                     <span className="text-xs text-red-600 font-bold">Sure?</span>
-                     <button
-                       onClick={(e) => { e.stopPropagation(); store.removeProfile(p.id); setDeleteConfirmId(null); }}
-                       className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-xs font-bold shadow-sm"
-                     >
-                       Yes
-                     </button>
-                     <button
-                       onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(null); }}
-                       className="text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-md text-xs font-bold"
-                     >
-                       No
-                     </button>
-                   </div>
-                ) : (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(p.id); }}
-                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-all"
-                    title="Delete Profile"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                )
-              )}
+
+            <div className="px-5 pb-5" onClick={e => e.stopPropagation()}>
+              <EntryDateForecast trips={p.trips} />
             </div>
           </div>
         ))}
