@@ -668,6 +668,37 @@ const WindowBreakdown = ({ trips, referenceDate }: { trips: Trip[], referenceDat
   );
 };
 
+// --- COMPONENT: Profile Window Status ---
+const ProfileWindowStatus = ({ trips }: { trips: Trip[] }) => {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const todayObj = parseISO(today);
+  const windowStart = subDaysPolyfill(todayObj, 179);
+  const used = calculateUsedDaysWithinWindow(trips, today);
+  const remaining = Math.max(0, 90 - used);
+  const color = remaining === 0 ? 'text-red-600' : remaining <= 10 ? 'text-orange-500' : 'text-emerald-600';
+  const barColor = remaining === 0 ? 'bg-red-500' : remaining <= 10 ? 'bg-orange-400' : 'bg-blue-500';
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Current 180-Day Window</h4>
+        <span className="text-[10px] font-mono text-gray-400">
+          {format(windowStart, DISPLAY_DATE_FORMAT)} – {format(todayObj, DISPLAY_DATE_FORMAT)}
+        </span>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(100, (used / 90) * 100)}%` }}></div>
+          </div>
+        </div>
+        <div className="text-sm font-bold text-gray-800">{used}<span className="text-gray-400 font-medium">/90</span></div>
+        <div className={`text-sm font-bold ${color}`}>{remaining} left</div>
+      </div>
+    </div>
+  );
+};
+
 // --- COMPONENT: Entry Date Forecast ---
 const EntryDateForecast = ({ trips }: { trips: Trip[] }) => {
   const forecasts = useMemo(() => {
@@ -1097,7 +1128,8 @@ const ProfilesScreen = ({ store }: { store: ReturnType<typeof useSchengenStore> 
               </div>
             </div>
 
-            <div className="px-5 pb-5" onClick={e => e.stopPropagation()}>
+            <div className="px-5 pb-5 space-y-4" onClick={e => e.stopPropagation()}>
+              <ProfileWindowStatus trips={p.trips} />
               <EntryDateForecast trips={p.trips} />
             </div>
           </div>
