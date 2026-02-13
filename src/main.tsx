@@ -850,6 +850,8 @@ const ProfileWindowStatus = ({ trips }: { trips: Trip[] }) => {
 
 // --- COMPONENT: Entry Date Forecast ---
 const EntryDateForecast = ({ trips }: { trips: Trip[] }) => {
+  const [customDate, setCustomDate] = useState('');
+
   const forecasts = useMemo(() => {
     const today = new Date();
     return Array.from({ length: 6 }, (_, i) => {
@@ -860,9 +862,40 @@ const EntryDateForecast = ({ trips }: { trips: Trip[] }) => {
     });
   }, [trips]);
 
+  const customResult = useMemo(() => {
+    if (!customDate) return null;
+    const date = parseISO(customDate);
+    const maxStay = getMaxSafeStayFromDate(trips, customDate);
+    return { date, maxDays: maxStay.maxDays, untilDate: maxStay.untilDate };
+  }, [customDate, trips]);
+
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
       <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4">Upcoming Entry Forecast</h3>
+
+      {/* Custom date picker */}
+      <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+        <div className="flex items-center gap-3">
+          <DateInput
+            label="Check a specific date"
+            value={customDate || format(new Date(), 'yyyy-MM-dd')}
+            onChange={setCustomDate}
+            className="flex-1"
+          />
+        </div>
+        {customResult && (
+          <div className="mt-3 pt-3 border-t border-blue-100">
+            {customResult.maxDays > 0 ? (
+              <p className="text-sm text-gray-700">
+                If you enter on <span className="font-bold text-gray-900">{format(customResult.date, 'dd MMM yyyy')}</span>, you can stay for <span className="font-bold text-blue-600">{customResult.maxDays} days</span> until <span className="font-bold text-gray-900">{customResult.untilDate}</span>
+              </p>
+            ) : (
+              <p className="text-sm text-red-600 font-bold">No days available if you enter on {format(customResult.date, 'dd MMM yyyy')}</p>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="space-y-3">
         {forecasts.map(({ date, dateStr, maxDays, untilDate }) => {
           const color = maxDays === 0 ? 'text-red-600' : maxDays <= 10 ? 'text-orange-500' : 'text-emerald-600';
