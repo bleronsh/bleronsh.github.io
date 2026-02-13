@@ -671,23 +671,88 @@ const WindowBreakdown = ({ trips, referenceDate }: { trips: Trip[], referenceDat
 };
 
 // --- PDF EXPORT ---
-function exportProfilesPDF(profiles: Profile[]) {
+function exportProfilesPDF(profiles: Profile[], calcDate: string) {
   const doc = new jsPDF();
   const today = new Date();
-  const todayStr = format(today, 'yyyy-MM-dd');
   const todayDisplay = format(today, DISPLAY_DATE_FORMAT);
-  const windowStartDate = subDaysPolyfill(today, 179);
+  const calcDateObj = parseISO(calcDate);
+  const calcDateDisplay = format(calcDateObj, DISPLAY_DATE_FORMAT);
+  const windowStartDate = subDaysPolyfill(calcDateObj, 179);
   const windowStartDisplay = format(windowStartDate, DISPLAY_DATE_FORMAT);
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const totalPages = profiles.length + 1; // summary + individual pages
 
+  // ===== PAGE 1: Summary =====
+  let y = 20;
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SchengenCalc', 14, y);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(120);
+  doc.text(`Generated: ${todayDisplay}`, pageWidth - 14, y, { align: 'right' });
+  y += 12;
+
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30);
+  doc.text('Summary Report', 14, y);
+  y += 8;
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80);
+  doc.text(`Calculation date: ${calcDateDisplay}`, 14, y);
+  y += 5;
+  doc.text(`180-day window: ${windowStartDisplay} \u2013 ${calcDateDisplay}`, 14, y);
+  y += 10;
+
+  const summaryRows = profiles.map(p => {
+    const used = calculateUsedDaysWithinWindow(p.trips, calcDate);
+    const maxStay = getMaxSafeStayFromDate(p.trips, calcDate);
+    return [
+      p.name,
+      String(p.trips.length),
+      String(used),
+      String(maxStay.maxDays),
+      maxStay.maxDays > 0 ? maxStay.untilDate : 'N/A'
+    ];
+  });
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Profile', 'Trips', 'Days Used', 'Max Stay', 'Until']],
+    body: summaryRows,
+    theme: 'grid',
+    headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold', fontSize: 10 },
+    bodyStyles: { fontSize: 10, textColor: [50, 50, 50] },
+    columnStyles: {
+      0: { fontStyle: 'bold' },
+      1: { halign: 'center' },
+      2: { halign: 'center' },
+      3: { halign: 'center', fontStyle: 'bold' },
+      4: { halign: 'center' }
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  // Footer for summary page
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(160);
+  doc.text('SchengenCalc \u2013 This document is for personal reference only and does not constitute legal advice.', 14, pageHeight - 10);
+  doc.text(`Page 1 of ${totalPages}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
+
+  // ===== INDIVIDUAL PROFILE PAGES =====
   profiles.forEach((profile, idx) => {
-    if (idx > 0) doc.addPage();
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 20;
+    doc.addPage();
+    y = 20;
 
     // Header
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30);
     doc.text('SchengenCalc', 14, y);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -703,9 +768,8 @@ function exportProfilesPDF(profiles: Profile[]) {
     y += 10;
 
     // Window status
-    const used = calculateUsedDaysWithinWindow(profile.trips, todayStr);
-    const remaining = Math.max(0, 90 - used);
-    const maxStay = getMaxSafeStayFromDate(profile.trips, todayStr);
+    const used = calculateUsedDaysWithinWindow(profile.trips, calcDate);
+    const maxStay = getMaxSafeStayFromDate(profile.trips, calcDate);
 
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -716,17 +780,17 @@ function exportProfilesPDF(profiles: Profile[]) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60);
-    doc.text(`Window: ${windowStartDisplay} \u2013 ${todayDisplay}`, 14, y);
+    doc.text(`Window: ${windowStartDisplay} \u2013 ${calcDateDisplay}`, 14, y);
     y += 6;
     doc.text(`Days used: ${used} / 90`, 14, y);
-    doc.text(`Days remaining: ${remaining}`, 100, y);
+    doc.text(`Days remaining: ${maxStay.maxDays}`, 100, y);
     y += 6;
-    doc.text(`Max stay from today: ${maxStay.maxDays} days (until ${maxStay.untilDate})`, 14, y);
+    doc.text(`Max stay from ${calcDateDisplay}: ${maxStay.maxDays} days (until ${maxStay.untilDate})`, 14, y);
     y += 12;
 
     // Trip history table (only trips within the 180-day window)
     const sortedTrips = [...profile.trips]
-      .filter(t => !isBefore(parseISO(t.exitDate), windowStartDate) && !isAfter(parseISO(t.entryDate), today))
+      .filter(t => !isBefore(parseISO(t.exitDate), windowStartDate) && !isAfter(parseISO(t.entryDate), calcDateObj))
       .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
 
     doc.setFontSize(11);
@@ -766,7 +830,6 @@ function exportProfilesPDF(profiles: Profile[]) {
         columnStyles: { 2: { halign: 'right', fontStyle: 'bold' } },
         margin: { left: 14, right: 14 },
         didParseCell: (data) => {
-          // Style the total row
           if (data.row.index === tripRows.length - 1) {
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.fillColor = [243, 244, 246];
@@ -785,7 +848,7 @@ function exportProfilesPDF(profiles: Profile[]) {
     y += 7;
 
     const forecastRows = Array.from({ length: 6 }, (_, i) => {
-      const date = addDays(today, (i + 1) * 14);
+      const date = addDays(calcDateObj, (i + 1) * 14);
       const dateStr = format(date, 'yyyy-MM-dd');
       const ms = getMaxSafeStayFromDate(profile.trips, dateStr);
       return [
@@ -806,12 +869,11 @@ function exportProfilesPDF(profiles: Profile[]) {
     });
 
     // Footer
-    const pageHeight = doc.internal.pageSize.getHeight();
     doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(160);
     doc.text('SchengenCalc \u2013 This document is for personal reference only and does not constitute legal advice.', 14, pageHeight - 10);
-    doc.text(`Page ${idx + 1} of ${profiles.length}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
+    doc.text(`Page ${idx + 2} of ${totalPages}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
   });
 
   doc.save(`schengen-report-${format(today, 'yyyy-MM-dd')}.pdf`);
@@ -933,6 +995,113 @@ const UserIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor
 const InfoIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 const CheckIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
 const AlertIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+
+// --- COMPONENT: Export PDF Modal ---
+const ExportPDFModal = ({ profiles, onClose }: { profiles: Profile[], onClose: () => void }) => {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(profiles.map(p => p.id)));
+  const [calcDate, setCalcDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  const toggleProfile = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === profiles.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(profiles.map(p => p.id)));
+    }
+  };
+
+  const handleExport = () => {
+    const selected = profiles.filter(p => selectedIds.has(p.id));
+    if (selected.length === 0) return;
+    exportProfilesPDF(selected, calcDate);
+    onClose();
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="p-6 border-b border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900">Export PDF Report</h3>
+            <p className="text-sm text-gray-500 mt-1">Select profiles and a calculation date.</p>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Date picker */}
+            <DateInput
+              label="Calculation Date"
+              value={calcDate}
+              onChange={setCalcDate}
+            />
+
+            {/* Profile selection */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-bold uppercase text-gray-400 tracking-wider">Profiles</label>
+                <button
+                  onClick={toggleAll}
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                >
+                  {selectedIds.size === profiles.length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {profiles.map(p => (
+                  <label
+                    key={p.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      selectedIds.has(p.id) ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p.id)}
+                      onChange={() => toggleProfile(p.id)}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs ${selectedIds.has(p.id) ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                      {p.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-bold text-gray-800">{p.name}</div>
+                      <div className="text-xs text-gray-400">{p.trips.length} trips</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-bold transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={selectedIds.size === 0}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Export {selectedIds.size} {selectedIds.size === 1 ? 'Profile' : 'Profiles'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
 
 // --- SCREENS ---
 
@@ -1243,6 +1412,7 @@ const ProfilesScreen = ({ store }: { store: ReturnType<typeof useSchengenStore> 
   const [name, setName] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const toggleExpanded = (id: string) => {
     setExpandedIds(prev => {
@@ -1258,7 +1428,7 @@ const ProfilesScreen = ({ store }: { store: ReturnType<typeof useSchengenStore> 
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-black text-gray-900">Manage Profiles</h2>
         <button
-          onClick={() => exportProfilesPDF(store.profiles)}
+          onClick={() => setShowExportModal(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -1404,6 +1574,10 @@ const ProfilesScreen = ({ store }: { store: ReturnType<typeof useSchengenStore> 
           );
         })}
       </div>
+
+      {showExportModal && (
+        <ExportPDFModal profiles={store.profiles} onClose={() => setShowExportModal(false)} />
+      )}
     </div>
   );
 };
@@ -1447,7 +1621,7 @@ const InfoScreen = () => (
 
 const App = () => {
   const store = useSchengenStore();
-  const [tab, setTab] = useState<'dash' | 'calc' | 'profiles' | 'info'>('dash');
+  const [tab, setTab] = useState<'dash' | 'calc' | 'profiles' | 'info'>('profiles');
 
   const navItems = [
     { id: 'dash', label: 'Dashboard', icon: CalendarIcon },
